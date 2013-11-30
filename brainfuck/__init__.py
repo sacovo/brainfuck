@@ -5,7 +5,8 @@ import getopt
 import sys
 from brainfuck import interpreter
 
-if __name__ == "__main__":
+
+def main():
     opts, args = getopt.getopt(sys.argv[1:], "f")
     for opt, arg in opts:
         if 'f' in opt:

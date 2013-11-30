@@ -1,11 +1,13 @@
 __author__ = 'sandro'
 import sys
+import traceback
 cells = [0]
 pointer = 0
 read_mode = 'a'
 write_mode = 'A'
 stack = []
 char_reader = None
+loop_pos = 0
 consume_chars = ()
 counter = 0
 print_end = ''
@@ -75,20 +77,22 @@ def loop():
 
 
 def end_loop():
+    global loop_pos
     if cells[pointer]:
         i = 1
-        pos = 0
         while i:
-            pos += 1
-            c = stack[-pos]
+            loop_pos += 1
+            c = stack[-loop_pos]
             if c == '[':
                 i -= 1
             elif c == ']':
                 i += 1
-        while pos:
-            read(stack[-pos], exclude_from_stack=True)
-            pos -= 1
-        read(']')
+        while loop_pos:
+            read(stack[-loop_pos], exclude_from_stack=True)
+            if loop_pos == 0:
+                break
+            loop_pos -= 1
+        read(']', exclude_from_stack=True)
 
 
 def comment():
