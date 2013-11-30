@@ -6,8 +6,9 @@ pointer = 0
 read_mode = 'a'
 write_mode = 'A'
 stack = []
+stack_pos = 0
+loop_stack = []
 char_reader = None
-loop_pos = 0
 consume_chars = ()
 counter = 0
 print_end = ''
@@ -69,30 +70,23 @@ def consume(c):
         counter -= 1
 
 
-def loop():
-    global counter, consume_chars, char_reader
-    if cells[pointer] == 0:
+def loop_start():
+    global consume_chars, counter
+    if cells[pointer]:
+        loop_stack.append(stack_pos)
+    else:
         consume_chars = ('[', ']')
         counter = 1
 
 
-def end_loop():
-    global loop_pos
+def loop_end():
+    global stack_pos
     if cells[pointer]:
-        i = 1
-        while i:
-            loop_pos += 1
-            c = stack[-loop_pos]
-            if c == '[':
-                i -= 1
-            elif c == ']':
-                i += 1
-        while loop_pos:
-            read(stack[-loop_pos], exclude_from_stack=True)
-            if loop_pos == 0:
-                break
-            loop_pos -= 1
-        read(']', exclude_from_stack=True)
+        stack_pos = loop_stack[-1]
+        while stack_pos < len(stack):
+            process_command(stack[stack_pos])
+    else:
+        loop_stack.pop()
 
 
 def comment():
@@ -123,8 +117,8 @@ function_map = {
     '.': output,
     ',': input_,
 
-    '[': loop,
-    ']': end_loop,
+    '[': loop_start,
+    ']': loop_end,
 
     '{': comment,
 
@@ -141,10 +135,17 @@ function_map = {
 }
 
 
+def process_command(c):
+    global stack_pos
+    stack_pos += 1
+    if c in function_map:
+        function_map[c]()
+
+
 def read(c, exclude_from_stack=False):
+    if not exclude_from_stack:
+        stack.append(c)
     if counter:
         consume(c)
     elif c in function_map:
-        function_map[c]()
-    if not exclude_from_stack:
-        stack.append(c)
+        process_command(c)
