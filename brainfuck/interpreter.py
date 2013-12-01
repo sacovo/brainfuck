@@ -1,4 +1,3 @@
-# TODO Create a help, with list of all commands
 __author__ = 'sandro'
 import sys
 
