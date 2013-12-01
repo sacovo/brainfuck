@@ -1,17 +1,14 @@
 __author__ = 'sandro'
 import sys
-import traceback
+
 cells = [0]
 pointer = 0
 read_mode = 'a'
 write_mode = 'A'
-stack = []
-stack_pos = 0
-loop_stack = []
-char_reader = None
-consume_chars = ()
-counter = 0
 print_end = ''
+
+counter = 0
+loops = []
 
 
 def increment_pointer():
@@ -42,7 +39,8 @@ def output():
 
 
 def input_():
-    cells[pointer] = base_changer_in[read_mode](input())
+    i = input() or '\n'
+    cells[pointer] = base_changer_in[read_mode](i)
 
 
 def input_mode(m):
@@ -62,38 +60,70 @@ def output_mode(m):
     return mode_m
 
 
-def consume(c):
-    global counter
-    if c == consume_chars[0]:
-        counter += 1
-    if c == consume_chars[1]:
-        counter -= 1
+def open_bracket():
+    global read, counter
+
+    orig_read = read
+    counter = 1
+    loops.append('')
+
+    def test(c):
+        global read, counter, test
+        if c == '[':
+            counter += 1
+        if c == ']':
+            counter -= 1
+        if counter:
+            loops[-1] += c
+        else:
+            read = orig_read
+            process_command(c)
+
+    read = test
 
 
-def loop_start():
-    global consume_chars, counter
-    if cells[pointer]:
-        loop_stack.append(stack_pos)
-    else:
-        consume_chars = ('[', ']')
-        counter = 1
-
-
-def loop_end():
-    global stack_pos
-    if cells[pointer]:
-        stack_pos = loop_stack[-1]
-        while stack_pos < len(stack):
-            process_command(stack[stack_pos])
-    else:
-        loop_stack.pop()
+def close_bracket():
+    loop = loops.pop()
+    while cells[pointer]:
+        for c in loop:
+            read(c)
 
 
 def comment():
-    global counter, consume_chars
-    consume_chars = ('{', '}')
-    counter = 1
+    global read
+    orig_read = read
 
+    def eat(c):
+        global read
+        if c == '}':
+            read = orig_read
+
+    read = eat
+
+
+def clear():
+    global cells, pointer
+    cells = [0]
+    pointer = 0
+
+
+def zero():
+    global pointer
+    pointer = 0
+
+
+def add_empty():
+    global pointer
+    cells.append(0)
+    pointer = len(cells) - 1
+
+
+def insert():
+    cells.insert(0, pointer)
+
+
+def remove():
+    del cells[pointer]
 
 base_changer_in = {
     'a': lambda c: ord(c[0]),
@@ -117,8 +147,8 @@ function_map = {
     '.': output,
     ',': input_,
 
-    '[': loop_start,
-    ']': loop_end,
+    '[': open_bracket,
+    ']': close_bracket,
 
     '{': comment,
 
@@ -131,21 +161,21 @@ function_map = {
     'B': output_mode('B'),
     'D': output_mode('D'),
     'H': output_mode('H'),
+
+    'c': clear,
+    '0': zero,
+    '*': add_empty,
+    'i': insert,
+    'r': remove,
+
     'E': sys.exit,
 }
 
 
 def process_command(c):
-    global stack_pos
-    stack_pos += 1
     if c in function_map:
         function_map[c]()
 
 
-def read(c, exclude_from_stack=False):
-    if not exclude_from_stack:
-        stack.append(c)
-    if counter:
-        consume(c)
-    elif c in function_map:
-        process_command(c)
+def read(c):
+    process_command(c)
