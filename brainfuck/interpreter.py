@@ -14,8 +14,71 @@ counter = 0
 # Loops is used for saving the code in loops, the most inner
 # loop will be stored at the rightmost place
 loops = []
+orig_read = None
 # This is used for executing a brainfuck file
 print_end = ''
+# Variable implementation
+variables = {}
+variable_name = ''
+"""
+Usage:  =var=, stores the current pointer value in the variable var
+        !var!, Write the value at the pointer 'var' into the current cell
+        :var:, set the current pointer to the pointer of var
+What is needed?
+    - A method which reads the name of a variable
+    - 3 methods that do the commands
+    - A dict that stores the variable values
+    - Some helper methods
+"""
+
+
+def read_var_name(c):
+    """"
+    Read characters from the input until a non al-num char is read, then return the name that inputted
+    """
+    global variable_name, read
+    if c.isalnum():
+        variable_name += c
+    else:
+        read = orig_read
+        process_command(c)
+
+
+def _handle_var(func):
+    global read, orig_read, variable_name
+    if variable_name:
+        func()
+        variable_name = ''
+    else:
+        orig_read = read
+        read = read_var_name
+
+
+def add_var():
+    """
+    If a variable name was already given, create a new variable with this name and the current pointer.
+    Otherwise start to read a variable name.
+    """
+    global read, orig_read, variable_name
+    _handle_var(lambda: variables.update({variable_name: pointer}))
+
+
+def input_var():
+    """
+    Inputs the value of the cell at the variable position into the current cell.
+    """
+    def handler():
+        cells[pointer] = cells[variables[variable_name]]
+    _handle_var(handler)
+
+
+def jump_to_var():
+    """
+    """
+    def handler():
+        global pointer
+        pointer = variables[variable_name]
+    _handle_var(handler)
 
 
 def increment_pointer():
@@ -34,11 +97,10 @@ def increment_pointer():
 def decrement_pointer():
     """
     Decrement the pointer by one (i.e. move on to the left).
-    @todo check, if pointer < 0
+    If already in the leftmost cell, do nothing.
     """
     global pointer
-
-    pointer -= 1
+    pointer = max(0, pointer - 1)
 
 
 def increment():
@@ -105,6 +167,24 @@ def output_mode(m):
     return mode_m
 
 
+def store_loop(c):
+    """
+    Inner method, to read the input commands and store them to loops.
+    Counts the opening and closing brackets, in order to know, when it has to stop.
+    @param c: character, that represents a command
+    """
+    global read, counter, orig_read
+    if c == '[':
+        counter += 1
+    if c == ']':
+        counter -= 1
+    if counter:
+        loops[-1] += c
+    else:
+        read = orig_read
+        process_command(c)
+
+
 def open_bracket():
     """
     Handle an opening bracket ('['), which indicates the beginning of a loop.
@@ -113,28 +193,11 @@ def open_bracket():
     it will replace the read method again and call <code>process_command(c)</code> with
     the closing bracket.
     """
-    global read, counter
+    global counter, orig_read, read
 
     orig_read = read
     counter = 1
     loops.append('')
-
-    def store_loop(c):
-        """
-        Inner method, to read the input commands and store them to loops.
-        Counts the opening and closing brackets, in order to know, when it has to stop.
-        @param c: character, that represents a command
-        """
-        global read, counter
-        if c == '[':
-            counter += 1
-        if c == ']':
-            counter -= 1
-        if counter:
-            loops[-1] += c
-        else:
-            read = orig_read
-            process_command(c)
 
     read = store_loop
 
@@ -146,22 +209,24 @@ def close_bracket():
     """
     loop = loops.pop()
     while cells[pointer]:
-        for c in loop:
-            read(c)
+        [read(c) for c in loop]
+
+
+def eat(c):
+    """
+    Consume all input until a '}' is read, then replace the read method with the old one.
+    """
+    global read
+    if c == '}':
+        read = orig_read
 
 
 def comment():
     """
     Handle a comment, starting with '{'. Replace the read method until a closing bracket ('}'), is found.
     """
-    global read
+    global read, orig_read
     orig_read = read
-
-    def eat(c):
-        global read
-        if c == '}':
-            read = orig_read
-
     read = eat
 
 
@@ -245,6 +310,10 @@ function_map = {
     'B': output_mode('B'),
     'D': output_mode('D'),
     'H': output_mode('H'),
+    # commands handling the variables
+    '=': add_var,
+    '!': input_var,
+    ':': jump_to_var,
     # commands handling the memory
     'c': clear,
     '0': zero,
